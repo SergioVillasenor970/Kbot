@@ -6,7 +6,10 @@ TODO:
 import os
 
 import discord
+import yt_dlp
 from dotenv import load_dotenv
+
+import downloader
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -68,13 +71,37 @@ async def disconnect(message):
         await say("No estoy en ningún canal de voz.")
     return
 
+async def pause(message):
+    # -------
+    voice_client = message.guild.voice_client # Cliente de voz del bot
+    # -------
+    if voice_client.is_playing():
+            voice_client.pause()
+    return
+
+async def resume(message):
+    # -------
+    voice_client = message.guild.voice_client # Cliente de voz del bot
+    # -------
+    if voice_client.is_paused():
+            voice_client.resume()
+    return
+
 async def play(message):
     # -------
     voice_channel = message.author.voice.channel # Canal de voz del usuario
     voice_client = message.guild.voice_client # Cliente de voz del bot
     say = message.channel.send # Enviar mensaje
     # -------
-    raw_path = os.path.join(BASE_DIR, "audio", "Parklife.webm")
+    url = message.content[5:].strip()
+
+    if not downloader.valid_url(url):
+        await say("Url no valida")
+        return
+
+
+    # Todo lo de abajo funciona y hay poco que modificar
+    raw_path = os.path.join(BASE_DIR, "audio", "Parklife.webm") # Cambiar el nombre del archivo para el video que se quiera reproducir
     if not message.author.voice or not message.author.voice.channel:
         await say("No estás en un canal de voz.")
         return
@@ -91,22 +118,6 @@ async def play(message):
     audio = discord.FFmpegPCMAudio(raw_path)
     voice_client.play(audio)
     await say("Reproduciendo.")
-    return
-
-async def pause(message):
-    # -------
-    voice_client = message.guild.voice_client # Cliente de voz del bot
-    # -------
-    if voice_client.is_playing():
-            voice_client.pause()
-    return
-
-async def resume(message):
-    # -------
-    voice_client = message.guild.voice_client # Cliente de voz del bot
-    # -------
-    if voice_client.is_paused():
-            voice_client.resume()
     return
 
 
@@ -139,6 +150,5 @@ async def on_message(message):
     if content == ('kresume'):
         await resume(message)
 
-        
 
 client.run(TOKEN)
