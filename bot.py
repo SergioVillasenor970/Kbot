@@ -9,6 +9,8 @@ import os
 import discord
 from dotenv import load_dotenv
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
 load_dotenv()
 TOKEN = os.getenv('DISCORD_TOKEN')
 GUILD = os.getenv('DISCORD_GUILD')
@@ -44,7 +46,7 @@ async def on_message(message):
         i += 1
         await message.channel.send("ACK")
 
-    if content == 'join':
+    if content == 'kjoin':
         if not message.author.voice or not message.author.voice.channel:
             await message.channel.send("No estas en un canal de voz.")
             return
@@ -56,7 +58,7 @@ async def on_message(message):
             await voice_channel.connect()
         await message.channel.send(f"Entrando a {voice_channel.name}.")
 
-    if content.startswith('play'):
+    if content.startswith('kplay'):
         '''
         raw_path = message.content[5:].strip().strip('"')
         if not raw_path:
@@ -66,9 +68,9 @@ async def on_message(message):
             await message.channel.send("No encuentro ese archivo.")
             return
         '''
-        raw_path = "C:/Users/sergi/git/Kbot/Parklife.webm"
+        raw_path = os.path.join(BASE_DIR, "audio", "Parklife.webm")
         if not message.author.voice or not message.author.voice.channel:
-            await message.channel.send("Entra a un canal de voz primero.")
+            await message.channel.send("No estás en un canal de voz.")
             return
 
         voice_channel = message.author.voice.channel
