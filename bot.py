@@ -84,7 +84,7 @@ async def on_message(message):
             #voice_client.stop()
             voice_client.pause()
 
-        audio = discord.FFmpegPCMAudio(raw_path, executable="C:\\Users\\sergi\\git\\Kbot\\ffmpeg\\bin\\ffmpeg.exe")
+        audio = discord.FFmpegPCMAudio(raw_path)
         voice_client.play(audio)
         await message.channel.send("Reproduciendo.")
         
