@@ -1,15 +1,11 @@
-'''
-TODO:
-* Cambiar ejecutable yt-dlp
-'''
-
 import os
-
 import discord
-import yt_dlp
+from discord.ext import tasks
 from dotenv import load_dotenv
 
+
 import downloader
+
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -21,6 +17,21 @@ intents = discord.Intents.default()
 intents.message_content = True
 intents.voice_states = True
 client = discord.Client(intents=intents)
+connecting_guild_ids = set()
+
+@tasks.loop(seconds=5.0)
+async def auto_dc():
+    for vc in client.voice_clients:
+        if not vc.is_connected() or not vc.channel:
+            continue
+        if vc.guild and vc.guild.id in connecting_guild_ids:
+            continue
+
+        # Disconnect if channel is empty
+        human_members = [member for member in vc.channel.members if not member.bot]
+        if len(human_members) <= 0:
+            await vc.disconnect()
+    
 
 @client.event
 async def on_ready():
@@ -33,28 +44,38 @@ async def on_ready():
         f'{guild.name}(id: {guild.id})'
     )
 
+    if not auto_dc.is_running():
+        auto_dc.start()
+
 
 async def test(message):
     await message.channel.send("ACK")
     return
 
 async def join(message):
+    if not message.author.voice or not message.author.voice.channel:
+        await message.channel.send ("No estas en un canal de voz.")
+        return
+    
     # -------
     voice_channel = message.author.voice.channel # Canal de voz del usuario
     voice_client = message.guild.voice_client # Cliente de voz del bot
     say = message.channel.send # Enviar mensaje
     # -------
 
-    if not message.author.voice or not voice_channel:
-        await say("No estas en un canal de voz.")
-        return
-
-    voice_channel = message.author.voice.channel
-    if voice_client:
-        await voice_client.move_to(voice_channel)
-    else:
-        await voice_channel.connect()
+    connecting_guild_ids.add(message.guild.id)
+    try:
+        if voice_client:
+            await voice_client.move_to(voice_channel)
+        else:
+            voice_client = await voice_channel.connect()
+    finally:
+        connecting_guild_ids.discard(message.guild.id)
     await say(f"Entrando a {voice_channel.name}.")
+
+    if not voice_client:
+        voice_client = message.guild.voice_client
+
     return
 
 async def disconnect(message):
@@ -74,9 +95,11 @@ async def disconnect(message):
 async def pause(message):
     # -------
     voice_client = message.guild.voice_client # Cliente de voz del bot
+    say = message.channel.send # Enviar mensaje
     # -------
     if voice_client.is_playing():
             voice_client.pause()
+            await say("Audio pausado.")
     return
 
 async def resume(message):
@@ -89,7 +112,6 @@ async def resume(message):
 
 async def play(message):
     # -------
-    voice_channel = message.author.voice.channel # Canal de voz del usuario
     voice_client = message.guild.voice_client # Cliente de voz del bot
     say = message.channel.send # Enviar mensaje
     # -------
@@ -99,25 +121,44 @@ async def play(message):
         await say("Url no valida")
         return
 
-
-    # Todo lo de abajo funciona y hay poco que modificar
-    raw_path = os.path.join(BASE_DIR, "audio", "Parklife.webm") # Cambiar el nombre del archivo para el video que se quiera reproducir
     if not message.author.voice or not message.author.voice.channel:
-        await say("No estás en un canal de voz.")
+        await say("No estas en un canal de voz.")
+        return
+    
+    tittle = downloader.download(url)
+
+    if not tittle:
+        await message.channel.send("No se pudo descargar el audio")
         return
 
+    raw_path = os.path.join(BASE_DIR, "audio", tittle) # Cambiar el nombre del archivo para el video que se quiera reproducir
+
     
+    # -------
+    voice_channel = message.author.voice.channel
+    # -------
+    
+    connecting_guild_ids.add(message.guild.id)
+    try:
+        if voice_client:
+            await voice_client.move_to(voice_channel)
+        else:
+            voice_client = await voice_channel.connect()
+    finally:
+        connecting_guild_ids.discard(message.guild.id)
+
     if not voice_client:
-        voice_client = await voice_channel.connect()
-    elif voice_client.channel != voice_channel:
-        await voice_client.move_to(voice_channel)
+        voice_client = message.guild.voice_client
 
+    if voice_client and voice_client.is_playing():
+        voice_client.pause()
+    if not voice_client:
+        await say("No pude conectarme al canal de voz.")
+        return
 
-    if voice_client.is_playing():
-            voice_client.pause()
     audio = discord.FFmpegPCMAudio(raw_path)
     voice_client.play(audio)
-    await say("Reproduciendo.")
+    await say(f"Reproduciendo {tittle[:-4]}.")
     return
 
 
