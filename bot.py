@@ -50,9 +50,11 @@ async def on_ready():
 
 async def test(message):
     await message.channel.send("ACK")
+    await message.channel.send(f"Latency: {round(client.latency*1000)} ms")
     return
 
 async def help(message):
+    # Modify help.txt to change, translate or add commands to the default help message
     try:
         with open("help.txt", "r", encoding="utf-8") as f:
             help_text = f.read()
@@ -75,9 +77,9 @@ async def join(message):
         return
     
     # -------
-    voice_channel = message.author.voice.channel # Canal de voz del usuario
-    voice_client = message.guild.voice_client # Cliente de voz del bot
-    say = message.channel.send # Enviar mensaje
+    voice_channel = message.author.voice.channel # User voice channel
+    voice_client = message.guild.voice_client # Bot voice client
+    say = message.channel.send # Send message
     # -------
 
     connecting_guild_ids.add(message.guild.id)
@@ -97,8 +99,8 @@ async def join(message):
 
 async def disconnect(message):
     # -------
-    voice_client = message.guild.voice_client # Cliente de voz del bot
-    say = message.channel.send # Enviar mensaje
+    voice_client = message.guild.voice_client # Bot voice client
+    say = message.channel.send # Send message
     # -------
 
     if voice_client:
@@ -111,8 +113,8 @@ async def disconnect(message):
 
 async def pause(message):
     # -------
-    voice_client = message.guild.voice_client # Cliente de voz del bot
-    say = message.channel.send # Enviar mensaje
+    voice_client = message.guild.voice_client # Bot voice client
+    say = message.channel.send # Send message
     # -------
     if voice_client and voice_client.is_playing():
             voice_client.pause()
@@ -121,7 +123,7 @@ async def pause(message):
 
 async def resume(message):
     # -------
-    voice_client = message.guild.voice_client # Cliente de voz del bot
+    voice_client = message.guild.voice_client # Bot voice client
     # -------
     if voice_client and voice_client.is_paused():
             voice_client.resume()
@@ -129,8 +131,8 @@ async def resume(message):
 
 async def play(message):
     # -------
-    voice_client = message.guild.voice_client # Cliente de voz del bot
-    say = message.channel.send # Enviar mensaje
+    voice_client = message.guild.voice_client # Bot voice client
+    say = message.channel.send # Send message
     # -------
     url = message.content[5:].strip()
 
@@ -148,11 +150,12 @@ async def play(message):
         await message.channel.send("No se pudo descargar el audio")
         return
 
-    raw_path = os.path.join(BASE_DIR, "audio", tittle) # Cambiar el nombre del archivo para el video que se quiera reproducir
+    # File that will play
+    raw_path = os.path.join(BASE_DIR, "audio", tittle)
 
     
     # -------
-    voice_channel = message.author.voice.channel
+    voice_channel = message.author.voice.channel # User voice channel
     # -------
     
     connecting_guild_ids.add(message.guild.id)
@@ -183,13 +186,13 @@ async def play(message):
 async def on_message(message):
 
 
-# Código de seguridad para que el bot no interprete sus propios mensajes
+# The bot can't read their own messages
     if message.author == client.user:
         return
 
     content = message.content.strip().lower()
 
-# Bloques de acciones por comandos
+# Commands
     if content == 'ktest':
         await test(message)
 
