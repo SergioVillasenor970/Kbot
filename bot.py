@@ -52,6 +52,23 @@ async def test(message):
     await message.channel.send("ACK")
     return
 
+async def help(message):
+    try:
+        with open("help.txt", "r", encoding="utf-8") as f:
+            help_text = f.read()
+
+        embed_message = discord.Embed(
+            title="🤖 Comandos del bot",
+            description=help_text,
+            color=discord.Color.blue()
+        )
+
+        await message.channel.send(embed=embed_message)
+
+    except FileNotFoundError:
+        await message.channel.send("❌ No se encontró el archivo help.txt")
+    return
+
 async def join(message):
     if not message.author.voice or not message.author.voice.channel:
         await message.channel.send ("No estas en un canal de voz.")
@@ -97,7 +114,7 @@ async def pause(message):
     voice_client = message.guild.voice_client # Cliente de voz del bot
     say = message.channel.send # Enviar mensaje
     # -------
-    if voice_client.is_playing():
+    if voice_client and voice_client.is_playing():
             voice_client.pause()
             await say("Audio pausado.")
     return
@@ -106,7 +123,7 @@ async def resume(message):
     # -------
     voice_client = message.guild.voice_client # Cliente de voz del bot
     # -------
-    if voice_client.is_paused():
+    if voice_client and voice_client.is_paused():
             voice_client.resume()
     return
 
@@ -173,7 +190,7 @@ async def on_message(message):
     content = message.content.strip().lower()
 
 # Bloques de acciones por comandos
-    if content == 'test':
+    if content == 'ktest':
         await test(message)
 
     if content == 'kjoin':
@@ -190,6 +207,9 @@ async def on_message(message):
 
     if content == ('kresume'):
         await resume(message)
+
+    if content == ('khelp'):
+        await help(message)
 
 
 client.run(TOKEN)

@@ -1,0 +1,33 @@
+🧪 test
+Comprueba si el bot está activo y responde
+
+🔊 kjoin
+Hace que el bot entre al canal de voz donde estás
+
+🔌 kdc / kdisconnect
+Desconecta el bot del canal de voz
+
+🎵 kplay <url>
+Reproduce audio desde YouTube
+- Solo soporta vídeos individuales
+- Si hay una canción reproduciéndose, la reemplaza
+
+⏸️ kpause
+Pausa la reproducción actual
+
+▶️ kresume
+Reanuda la música pausada
+
+❓ khelp
+Muestra esta lista de comandos
+
+────────────────────────────
+
+ℹ️ NOTAS
+- Puede haber retraso dependiendo del servidor.
+- Algunas funciones requieren que estés en un canal de voz.
+
+────────────────────────────
+
+🔗 CÓDIGO BASE
+https://github.com/SergioVillasenor970/Kbot
