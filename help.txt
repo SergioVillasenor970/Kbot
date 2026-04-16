@@ -10,13 +10,19 @@ Desconecta el bot del canal de voz
 🎵 kplay <url>
 Reproduce audio desde YouTube
 - Solo soporta vídeos individuales
-- Si hay una canción reproduciéndose, la reemplaza
 
 ⏸️ kpause
 Pausa la reproducción actual
 
 ▶️ kresume
 Reanuda la música pausada
+
+⏭️ kskip
+Salta la reproducción actual
+
+🔀 kshuffle
+Baraja la lista de reproducción
+
 
 ❓ khelp
 Muestra esta lista de comandos
