@@ -1,0 +1,3 @@
+This directory is where all the other folders for different servers will be created to store audio files to play.
+The bot has some functionality to avoid taking too much storage, however, if the application is working for too many clients this directory will get real heavy real fast.
+It is recommended to set up some external system event to clean up this entire directory periodically.

@@ -5,19 +5,22 @@ from dotenv import load_dotenv
 
 
 import downloader
+import player
+import state
 
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 load_dotenv()
 TOKEN = os.getenv('DISCORD_TOKEN')
-GUILD = os.getenv('DISCORD_GUILD')
+GUILD = os.getenv('DISCORD_GUILD', '')
+GUILDS = GUILD.split(",") if GUILD else []
 
-intents = discord.Intents.default()
-intents.message_content = True
-intents.voice_states = True
-client = discord.Client(intents=intents)
-connecting_guild_ids = set()
+intents = state.intents
+intents.message_content = state.intents.message_content
+intents.voice_states = state.intents.voice_states
+client = state.client
+connecting_guild_ids = state.connecting_guild_ids
 
 @tasks.loop(seconds=5.0)
 async def auto_dc():
@@ -35,14 +38,20 @@ async def auto_dc():
 
 @client.event
 async def on_ready():
+    print(f'{client.user} is connected to the following guild:\n')
     for guild in client.guilds:
-        if guild.name == GUILD:
-            break
+        if guild.name in GUILDS:
+                print(
+                    f'{guild.name}(id: {guild.id})'
+                    )
+        else:
+            print(
+                f'Servidor no autorizado: {guild.name}(id: {guild.id}). Abandonando'
+                )
+            await guild.leave()
 
-    print(
-        f'{client.user} is connected to the following guild:\n'
-        f'{guild.name}(id: {guild.id})'
-    )
+    #Cleans audio files from all servers
+    downloader.clean_all_guilds()
 
     if not auto_dc.is_running():
         auto_dc.start()
@@ -107,6 +116,7 @@ async def disconnect(message):
         await voice_client.disconnect()
         await say("Desconectado del canal.")
         voice_client.cleanup()
+        connecting_guild_ids.discard(message.guild.id)
     else:
         await say("No estoy en ningún canal de voz.")
     return
@@ -127,58 +137,6 @@ async def resume(message):
     # -------
     if voice_client and voice_client.is_paused():
             voice_client.resume()
-    return
-
-async def play(message):
-    # -------
-    voice_client = message.guild.voice_client # Bot voice client
-    say = message.channel.send # Send message
-    # -------
-    url = message.content[5:].strip()
-
-    if not downloader.valid_url(url):
-        await say("Url no valida")
-        return
-
-    if not message.author.voice or not message.author.voice.channel:
-        await say("No estas en un canal de voz.")
-        return
-    
-    tittle = downloader.download(url)
-
-    if not tittle:
-        await message.channel.send("No se pudo descargar el audio")
-        return
-
-    # File that will play
-    raw_path = os.path.join(BASE_DIR, "audio", tittle)
-
-    
-    # -------
-    voice_channel = message.author.voice.channel # User voice channel
-    # -------
-    
-    connecting_guild_ids.add(message.guild.id)
-    try:
-        if voice_client:
-            await voice_client.move_to(voice_channel)
-        else:
-            voice_client = await voice_channel.connect()
-    finally:
-        connecting_guild_ids.discard(message.guild.id)
-
-    if not voice_client:
-        voice_client = message.guild.voice_client
-
-    if voice_client and voice_client.is_playing():
-        voice_client.pause()
-    if not voice_client:
-        await say("No pude conectarme al canal de voz.")
-        return
-
-    audio = discord.FFmpegPCMAudio(raw_path)
-    voice_client.play(audio)
-    await say(f"Reproduciendo {tittle[:-4]}.")
     return
 
 
@@ -203,13 +161,19 @@ async def on_message(message):
         await disconnect(message)
 
     if content.startswith('kplay'):
-        await play(message)
+        await player.playlist_add(message)
     
     if content == ('kpause'):
         await pause(message)
 
     if content == ('kresume'):
         await resume(message)
+    
+    if content == ('kskip'):
+        await player.playlist_next(message.guild.id)
+    
+    if content == ('kshuffle'):
+        await player.playlist_shuffle(message)
 
     if content == ('khelp'):
         await help(message)
