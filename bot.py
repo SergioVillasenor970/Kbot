@@ -1,5 +1,6 @@
 import os
 import discord
+import time
 from discord.ext import tasks
 from dotenv import load_dotenv
 
@@ -24,16 +25,35 @@ connecting_guild_ids = state.connecting_guild_ids
 
 @tasks.loop(seconds=5.0)
 async def auto_dc():
+    current_time = time.time()
     for vc in client.voice_clients:
         if not vc.is_connected() or not vc.channel:
             continue
         if vc.guild and vc.guild.id in connecting_guild_ids:
             continue
 
+        guild_id = vc.guild.id
+
         # Disconnect if channel is empty
         human_members = [member for member in vc.channel.members if not member.bot]
         if len(human_members) <= 0:
             await vc.disconnect()
+            if guild_id in state.last_playing_time:
+                del state.last_playing_time[guild_id]
+            continue
+
+        # Disconnect if no audio playing for 5 minutes
+        if not vc.is_playing():
+            if guild_id not in state.last_playing_time:
+                state.last_playing_time[guild_id] = current_time
+            else:
+                elapsed = current_time - state.last_playing_time[guild_id]
+                if elapsed >= 300:  #5 minutes
+                    await vc.disconnect()
+                    state.last_playing_time.pop(guild_id, None)
+        else:
+            # Reset timer if audio is playing
+            state.last_playing_time[guild_id] = current_time
     
 
 @client.event
@@ -118,6 +138,7 @@ async def disconnect(message):
         await say(embed=state.blue_embed("Desconectado del canal.", "🔊"))
         voice_client.cleanup()
         connecting_guild_ids.discard(message.guild.id)
+        state.last_playing_time.pop(message.guild.id, None)
     else:
         await say(embed=state.blue_embed("No estoy en ningún canal de voz.", "⚠️"))
     return

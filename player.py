@@ -43,44 +43,49 @@ def _format_duration(seconds):
     return f"{remaining_minutes}:{remaining_seconds:02d}"
 
 
-def search_videos(query):
+async def search_videos(query):
+    """Search videos asynchronously without blocking the event loop."""
     ydl_opts = {
         "quiet": True,
         "skip_download": True,
         "noplaylist": True,
     }
 
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        info = ydl.extract_info(f"ytsearch5:{query}", download=False)
+    def _search_blocking():
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(f"ytsearch5:{query}", download=False)
 
-    entries = info.get("entries") or []
-    results = []
-    for entry in entries[:5]:
-        if not entry:
-            continue
+        entries = info.get("entries") or []
+        results = []
+        for entry in entries[:5]:
+            if not entry:
+                continue
 
-        url = entry.get("webpage_url") or entry.get("url") or entry.get("original_url")
-        if url and not url.startswith(("http://", "https://")):
-            video_id = entry.get("id") or url
-            url = f"https://www.youtube.com/watch?v={video_id}"
+            url = entry.get("webpage_url") or entry.get("url") or entry.get("original_url")
+            if url and not url.startswith(("http://", "https://")):
+                video_id = entry.get("id") or url
+                url = f"https://www.youtube.com/watch?v={video_id}"
 
-        if not url:
-            continue
+            if not url:
+                continue
 
-        results.append(
-            {
-                "title": entry.get("title") or "Sin título",
-                "url": url,
-                "duration": entry.get("duration"),
-                "channel": entry.get("channel") or entry.get("uploader") or "",
-            }
-        )
+            results.append(
+                {
+                    "title": entry.get("title") or "Sin título",
+                    "url": url,
+                    "duration": entry.get("duration"),
+                    "channel": entry.get("channel") or entry.get("uploader") or "",
+                }
+            )
 
-    return results
+        return results
+    
+    # Run blocking yt-dlp call in thread pool
+    return await asyncio.to_thread(_search_blocking)
 
 
 async def choose_search_result(message, query):
-    results = search_videos(query)
+    results = await search_videos(query)
 
     if not results:
         await message.channel.send(embed=state.blue_embed("No encontré resultados para esa búsqueda.", "⚠️"))
@@ -113,7 +118,7 @@ async def choose_search_result(message, query):
     def check(reaction, user):
         return (
             reaction.message.id == results_message.id
-            and user != state.client.user
+            and user == message.author
             and str(reaction.emoji) in NUMBER_EMOJIS[:len(results)]
         )
 
@@ -144,7 +149,9 @@ async def play(message, url=None):
         await say(embed=state.blue_embed("No estas en un canal de voz.", "⚠️"))
         return
     
-    tittle = downloader.download(url, message.guild.id)
+    # Acquire per-guild lock to prevent concurrent downloads
+    async with state.get_download_lock(message.guild.id):
+        tittle = await downloader.download(url, message.guild.id)
 
     if not tittle:
         await message.channel.send(embed=state.blue_embed("No se pudo descargar el audio", "❌"))
@@ -217,33 +224,38 @@ async def playlist_add(message):
         "url": url,
     }
 
-    #Case 1: Nothing is playing
-    if message.guild.id not in playlist_manager:
-        playlist_manager[message.guild.id] = [track]
-        await play(message, url)
+    # Use lock to prevent concurrent modifications to playlist_manager
+    async with state.playlist_lock:
+        #Case 1: Nothing is playing
+        if message.guild.id not in playlist_manager:
+            playlist_manager[message.guild.id] = [track]
+            await play(message, url)
 
-    #Case 2: There is a queue
-    else:
-        guild_playlist = playlist_manager[message.guild.id]
-        guild_playlist.append(track)
-        playlist_manager[message.guild.id] = guild_playlist
-        await message.channel.send(embed=state.blue_embed(f"Añadido a la cola. Posición: {len(guild_playlist)-1}", "🎵"))
+        #Case 2: There is a queue
+        else:
+            guild_playlist = playlist_manager[message.guild.id]
+            guild_playlist.append(track)
+            playlist_manager[message.guild.id] = guild_playlist
+            await message.channel.send(embed=state.blue_embed(f"Añadido a la cola. Posición: {len(guild_playlist)-1}", "🎵"))
 
     return
 
 async def playlist_next(guild_id):
-    if guild_id not in playlist_manager:
-        return
+    async with state.playlist_lock:
+        if guild_id not in playlist_manager:
+            return
 
-    guild_playlist = playlist_manager[guild_id]
-    if guild_playlist:
-        guild_playlist.pop(0)
+        guild_playlist = playlist_manager[guild_id]
+        if guild_playlist:
+            guild_playlist.pop(0)
 
-    if not guild_playlist:
-        playlist_clean(guild_id)
-        return
+        if not guild_playlist:
+            playlist_clean(guild_id)
+            return
 
-    next_track = guild_playlist[0]
+        next_track = guild_playlist[0]
+    
+    # Play outside the lock to avoid blocking other operations
     await play(_track_message(next_track), _track_url(next_track))
     return
 
@@ -254,17 +266,18 @@ def playlist_clean(guild_id):
     return
 
 async def playlist_shuffle(message):
-    if message.guild.id in playlist_manager:
-        guild_playlist = playlist_manager[message.guild.id]
-        if len(guild_playlist) <= 2:
-            await message.channel.send(embed=state.blue_embed("No hay suficientementes elementos para barajar", "⚠️"))
-            return
-        first = guild_playlist[0]
-        rest = guild_playlist[1:]
-        random.shuffle(rest)
-        shuffled_playlist = [first] + rest
-        playlist_manager[message.guild.id] = shuffled_playlist
-        await message.channel.send(embed=state.blue_embed("Lista barajada", "🔀"))
-    else:
-        await message.channel.send(embed=state.blue_embed("No hay ninguna lista sonando", "⚠️"))
+    async with state.playlist_lock:
+        if message.guild.id in playlist_manager:
+            guild_playlist = playlist_manager[message.guild.id]
+            if len(guild_playlist) <= 2:
+                await message.channel.send(embed=state.blue_embed("No hay suficientementes elementos para barajar", "⚠️"))
+                return
+            first = guild_playlist[0]
+            rest = guild_playlist[1:]
+            random.shuffle(rest)
+            shuffled_playlist = [first] + rest
+            playlist_manager[message.guild.id] = shuffled_playlist
+            await message.channel.send(embed=state.blue_embed("Lista barajada", "🔀"))
+        else:
+            await message.channel.send(embed=state.blue_embed("No hay ninguna lista sonando", "⚠️"))
     return

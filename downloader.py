@@ -1,6 +1,7 @@
 import os
 import shutil
 import yt_dlp
+import asyncio
 
 async def valid_url(url):
     ydl_opts = {
@@ -9,44 +10,53 @@ async def valid_url(url):
         'noplaylist': True
     }
 
-    try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=False)
-            if info.get("duration") > 1800:
-                return False
-        return True
-    except:
-        return False
+    def _check_url():
+        try:
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(url, download=False)
+                if info.get("duration") > 1800:
+                    return False
+            return True
+        except:
+            return False
+    
+    # Run blocking yt-dlp call in thread pool
+    return await asyncio.to_thread(_check_url)
 
-def download(url, guild_id):
+async def download(url, guild_id):
+    """Download audio asynchronously without blocking the event loop."""
     guild_id = str(guild_id)
     base_dir = os.path.dirname(os.path.abspath(__file__))
     audio_dir = os.path.join(base_dir, "audio", guild_id)
 
-    clean_files(guild_id)
+    def _download_blocking():
+        clean_files(guild_id)
 
-    ydl_opts = {
-        'format': 'bestaudio/best',
-        'outtmpl': os.path.join(audio_dir, '%(title)s.%(ext)s'),
-        'quiet': True,
-        'noplaylist': True,
-        'postprocessors': [{
-            'key': 'FFmpegExtractAudio',
-            'preferredcodec': 'mp3',
-            'preferredquality': '192',
-        }],
-    }
+        ydl_opts = {
+            'format': 'bestaudio/best',
+            'outtmpl': os.path.join(audio_dir, '%(title)s.%(ext)s'),
+            'quiet': True,
+            'noplaylist': True,
+            'postprocessors': [{
+                'key': 'FFmpegExtractAudio',
+                'preferredcodec': 'mp3',
+                'preferredquality': '192',
+            }],
+        }
 
-    try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=True)
-            filename = ydl.prepare_filename(info)
-            filename = os.path.splitext(filename)[0] + ".mp3"
-            return os.path.basename(filename)
+        try:
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(url, download=True)
+                filename = ydl.prepare_filename(info)
+                filename = os.path.splitext(filename)[0] + ".mp3"
+                return os.path.basename(filename)
 
-    except Exception as e:
-        print("Error:", e)
-        return None
+        except Exception as e:
+            print("Error:", e)
+            return None
+    
+    # Run blocking yt-dlp call in thread pool
+    return await asyncio.to_thread(_download_blocking)
     
 
 def clean_files(guild_id):
@@ -76,7 +86,7 @@ def clean_all_guilds():
     ---- DANGER ----
     This function permanently removes entire directories and files based on where it is located.
     Running it outside the propossed file structure may cause irreversable losses of data
-    Execute it it at your own risk
+    Execute it at your own risk
     '''
     base_dir = os.path.dirname(os.path.abspath(__file__))
     audio_dir = os.path.join(base_dir, "audio")
