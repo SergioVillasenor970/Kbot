@@ -53,13 +53,14 @@ async def on_ready():
     #Cleans audio files from all servers
     downloader.clean_all_guilds()
 
+    await client.change_presence(activity=discord.Game(name="escribe khelp en un canal"))
+
     if not auto_dc.is_running():
         auto_dc.start()
 
 
 async def test(message):
-    await message.channel.send("ACK")
-    await message.channel.send(f"Latency: {round(client.latency*1000)} ms")
+    await message.channel.send(embed=state.blue_embed(f"{round(client.latency*1000)} ms", "📡 Latencia"))
     return
 
 async def help(message):
@@ -77,7 +78,7 @@ async def help(message):
         await message.channel.send(embed=embed_message)
 
     except FileNotFoundError:
-        await message.channel.send("❌ No se encontró el archivo help.txt")
+        await message.channel.send(embed=state.blue_embed("No se encontró el archivo help.txt", "❌"))
     return
 
 async def join(message):
@@ -99,7 +100,7 @@ async def join(message):
             voice_client = await voice_channel.connect()
     finally:
         connecting_guild_ids.discard(message.guild.id)
-    await say(f"Entrando a {voice_channel.name}.")
+    await say(embed=state.blue_embed(f"Entrando a {voice_channel.name}.", "🔊"))
 
     if not voice_client:
         voice_client = message.guild.voice_client
@@ -114,11 +115,11 @@ async def disconnect(message):
 
     if voice_client:
         await voice_client.disconnect()
-        await say("Desconectado del canal.")
+        await say(embed=state.blue_embed("Desconectado del canal.", "🔊"))
         voice_client.cleanup()
         connecting_guild_ids.discard(message.guild.id)
     else:
-        await say("No estoy en ningún canal de voz.")
+        await say(embed=state.blue_embed("No estoy en ningún canal de voz.", "⚠️"))
     return
 
 async def pause(message):
@@ -128,7 +129,7 @@ async def pause(message):
     # -------
     if voice_client and voice_client.is_playing():
             voice_client.pause()
-            await say("Audio pausado.")
+            await say(embed=state.blue_embed("Audio pausado.", "⏸️"))
     return
 
 async def resume(message):

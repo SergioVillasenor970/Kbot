@@ -21,13 +21,13 @@ async def play(message):
     url = message.content[5:].strip()
 
     if not message.author.voice or not message.author.voice.channel:
-        await say("No estas en un canal de voz.")
+        await say(embed=state.blue_embed("No estas en un canal de voz.", "⚠️"))
         return
     
     tittle = downloader.download(url,message.guild.id)
 
     if not tittle:
-        await message.channel.send("No se pudo descargar el audio")
+        await message.channel.send(embed=state.blue_embed("No se pudo descargar el audio", "❌"))
         return
 
     # File that will play
@@ -53,7 +53,7 @@ async def play(message):
     if voice_client and voice_client.is_playing():
         voice_client.pause()
     if not voice_client:
-        await say("No pude conectarme al canal de voz.")
+        await say(embed=state.blue_embed("No pude conectarme al canal de voz.", "❌"))
         return
 
     audio = discord.FFmpegPCMAudio(raw_path)
@@ -64,7 +64,7 @@ async def play(message):
             state.client.loop,
         ),
     )
-    await say(f"Reproduciendo {tittle[:-4]}.")
+    await say(embed=state.blue_embed(f"Reproduciendo {tittle[:-4]}.", "🎵"))
     return
 
 
@@ -79,7 +79,7 @@ async def playlist_add(message):
 
     url = message.content[5:].strip()
     if not await downloader.valid_url(url):
-        await message.channel.send("Url no valida o duración máxima de video excedido (30 min)")
+        await message.channel.send(embed=state.blue_embed("Url no valida o duración máxima de video excedido (30 min)", "⚠️"))
         return
 
     #Case 1: Nothing is playing
@@ -92,7 +92,7 @@ async def playlist_add(message):
         guild_playlist = playlist_manager[message.guild.id]
         guild_playlist.append(message)
         playlist_manager[message.guild.id] = guild_playlist
-        await message.channel.send(f"Añadido a la cola. Posición: {len(guild_playlist)-1}")
+        await message.channel.send(embed=state.blue_embed(f"Añadido a la cola. Posición: {len(guild_playlist)-1}", "🎵"))
 
     return
 
@@ -121,14 +121,14 @@ async def playlist_shuffle(message):
     if message.guild.id in playlist_manager:
         guild_playlist = playlist_manager[message.guild.id]
         if len(guild_playlist) <= 2:
-            await message.channel.send("No hay suficientementes elementos para barajar")
+            await message.channel.send(embed=state.blue_embed("No hay suficientementes elementos para barajar", "⚠️"))
             return
         first = guild_playlist[0]
         rest = guild_playlist[1:]
         random.shuffle(rest)
         shuffled_playlist = [first] + rest
         playlist_manager[message.guild.id] = shuffled_playlist
-        await message.channel.send("Lista barajada")
+        await message.channel.send(embed=state.blue_embed("Lista barajada", "🔀"))
     else:
-        await message.channel.send("No hay ninguna lista sonando")
+        await message.channel.send(embed=state.blue_embed("No hay ninguna lista sonando", "⚠️"))
     return
